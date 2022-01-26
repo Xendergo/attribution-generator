@@ -3,6 +3,7 @@ mod styling;
 
 use std::{collections::HashSet, path::PathBuf};
 
+use clipboard::{ClipboardContext, ClipboardProvider};
 use data::{get_directory_data, get_path};
 use iced::*;
 
@@ -18,6 +19,7 @@ struct App {
     attribution_options: Vec<(String, String)>,
     location_state: text_input::State,
     scroll_state: scrollable::State,
+    copy_button_state: button::State,
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +27,7 @@ enum Message {
     LocationChanged(String),
     TickAttribution(usize),
     UntickAttribution(usize),
+    Copy,
 }
 
 impl Sandbox for App {
@@ -45,6 +48,7 @@ impl Sandbox for App {
             attributions_ticked: HashSet::new(),
             location_state: text_input::State::default(),
             scroll_state: scrollable::State::default(),
+            copy_button_state: button::State::default(),
         }
     }
 
@@ -75,6 +79,17 @@ impl Sandbox for App {
                 self.attributions_ticked
                     .remove(&self.attribution_options[index].0);
             }
+
+            Message::Copy => {
+                let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
+
+                clipboard
+                    .set_contents(Self::attribution_text(
+                        &self.attribution_options,
+                        &self.attributions_ticked,
+                    ))
+                    .unwrap();
+            }
         }
     }
 
@@ -99,6 +114,15 @@ impl Sandbox for App {
                     .style(styling::TextInput())
                     .into(),
                     Self::attribution_list(&self.attribution_options, &self.attributions_ticked),
+                    Button::new(&mut self.copy_button_state, Text::new("Copy"))
+                        .on_press(Message::Copy)
+                        .into(),
+                    Text::new(Self::attribution_text(
+                        &self.attribution_options,
+                        &self.attributions_ticked,
+                    ))
+                    .color(Color::WHITE)
+                    .into(),
                 ])
                 .align_items(Align::Center)
                 .spacing(styling::PADDING)
@@ -110,7 +134,7 @@ impl Sandbox for App {
 
 impl App {
     fn attribution_list<'a>(
-        attribution_options: &Vec<(String, String)>,
+        attribution_options: &[(String, String)],
         attributions_ticked: &HashSet<String>,
     ) -> Element<'a, Message> {
         Column::with_children(
@@ -148,5 +172,20 @@ impl App {
                 .into(),
         ])
         .into()
+    }
+
+    fn attribution_text(
+        attribution_options: &[(String, String)],
+        attributions_ticked: &HashSet<String>,
+    ) -> String {
+        let mut attributions: Vec<&str> = Vec::new();
+
+        for maybe_attribution in attribution_options {
+            if attributions_ticked.contains(&maybe_attribution.0) {
+                attributions.push(&maybe_attribution.1)
+            }
+        }
+
+        attributions.join("\n\n")
     }
 }
