@@ -3,14 +3,13 @@ mod styling;
 
 use std::{collections::HashSet, path::PathBuf};
 
-use clipboard::{ClipboardContext, ClipboardProvider};
 use data::{get_directory_data, get_path};
 use iced::*;
 
 use crate::data::write_path;
 
 fn main() -> iced::Result {
-    <App as Sandbox>::run(Settings::default())
+    <App as Application>::run(Settings::default())
 }
 
 struct App {
@@ -30,13 +29,15 @@ enum Message {
     Copy,
 }
 
-impl Sandbox for App {
+impl Application for App {
     type Message = Message;
+    type Executor = executor::Default;
+    type Flags = ();
 
-    fn new() -> Self {
+    fn new(_: ()) -> (Self, Command<Message>) {
         let maybe_path = get_path();
 
-        App {
+        (App {
             attribution_options: match &maybe_path {
                 Some(path) => match get_directory_data(PathBuf::from(path)) {
                     Ok(options) => options,
@@ -49,14 +50,14 @@ impl Sandbox for App {
             location_state: text_input::State::default(),
             scroll_state: scrollable::State::default(),
             copy_button_state: button::State::default(),
-        }
+        }, Command::none())
     }
 
     fn title(&self) -> String {
         "Attribution generator".to_owned()
     }
 
-    fn update(&mut self, message: Self::Message) {
+    fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
             Message::LocationChanged(v) => {
                 let path = PathBuf::from(&v);
@@ -68,27 +69,29 @@ impl Sandbox for App {
 
                     write_path(v).ok();
                 }
+
+                Command::none()
             }
 
             Message::TickAttribution(index) => {
                 self.attributions_ticked
                     .insert(self.attribution_options[index].0.clone());
+
+                Command::none()
             }
 
             Message::UntickAttribution(index) => {
                 self.attributions_ticked
                     .remove(&self.attribution_options[index].0);
+
+                Command::none()
             }
 
             Message::Copy => {
-                let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
-
-                clipboard
-                    .set_contents(Self::attribution_text(
+                clipboard::write(Self::attribution_text(
                         &self.attribution_options,
                         &self.attributions_ticked,
                     ))
-                    .unwrap();
             }
         }
     }
@@ -124,7 +127,7 @@ impl Sandbox for App {
                     .color(Color::WHITE)
                     .into(),
                 ])
-                .align_items(Align::Center)
+                .align_items(Alignment::Center)
                 .spacing(styling::PADDING)
                 .padding(styling::PADDING),
             )
